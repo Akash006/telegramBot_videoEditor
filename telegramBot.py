@@ -42,32 +42,54 @@ def send_typing_action(func):
 
 @send_typing_action
 def photo(update, context):
-    """ Processing image """
-
-    reply_keyboard = [["/cleanup"],["/youtube"],["/cancel"]]
-    update.message.reply_text("Nice Image !!\n \
-Photos btw 5-10 are good to start\n\n \
-/youtube - Download audio from youtube video url\n\n \
-/convert - Convert your pictures into video", reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
+    """ 
+        PURPOSE: Download images but it will also compress it by default.
+                 Not recommended way try to send image as a file.
+    """
 
     pic = update.message.photo[-1].get_file()
 
-    dt = datetime.datetime.now()
-    filedate = dt.strftime("%d%b%y_%H%M%S")
-    name = update.message.chat.username
-
-    pic.download(default.get("photo_path") + "\\" + f"{name}_{filedate}.jpg" )
-
+    name = os.path.basename(pic["file_path"])
+    pic.download(default.get("photo_path") + "\\" + f"{name}" )
     log.info("Photo received {0}".format(default.get("photo_path") + "\\" + f"{name}_{filedate}.jpg"))
 
 @send_typing_action
+def getMediaByFile(update, context):
+    '''
+        PURPOSE: Download image without compressing. User Send Image 
+                 via File option.
+    '''
+
+    filename = update["message"]["document"]["file_name"]
+    pic = update.message.document.get_file()
+
+    today = datetime.datetime.now()
+    name = today.strftime('%d_%b_%y_%H%M%S') + "_" + filename
+    img_path = os.path.join(default.get("photo_path"), name)
+
+    pic.download(img_path)
+
+    log.info(f"Photo File downloaded at loc: {name}")
+
+    return None
+
+@send_typing_action
 def youtube(update, context):
+    """
+        PURPOSE: Fetching the youtube URL.
+    """
+
     log.info("Setting youtube song")
     update.message.reply_text("Please share the Youtube video URL.")
     return YOUTUBE
 
 @send_typing_action
 def you(update, context):
+    """
+        PURPOSE: Getting the Start and End time to trim the youtube url
+                 and collect the audio.
+    """
+
     url = update.message.text
     update.message.reply_text("Share the start and end time of Video.\n\n \
 Syntax: mm:ss mm:ss\n\n \
@@ -81,6 +103,11 @@ For Free tier customers don't give video time more then 10 sec as it will take m
 
 @send_typing_action
 def time(update, context):
+    """
+        PURPOSE: Suggesting customer to use /convert option. Also
+                 trimming the start and end time.
+    """
+
     time = update.message.text
 
     update.message.reply_text("You may also want to start conversion..\n\n \
@@ -95,6 +122,10 @@ def time(update, context):
 
 @send_typing_action
 def convert(update, context):
+    """
+        PURPOSE: Convert all the downloaded images to video.
+    """
+
     log.info("Starting converion")
 
     update.message.reply_text("Video is being prepared.\n\nThis may take upto 5 min due to length of the audio & also due to H/W issue.")
@@ -119,6 +150,10 @@ def convert(update, context):
 
 @send_typing_action
 def cleanup(update, context):
+    """
+        PURPOSE: Manual override to delete all photos from server.
+    """
+
     log.info(f"Cleaning up all pictures from {default['photo_path']}")
 
     files = glob.glob(default["photo_path"] + "\\*")
@@ -129,6 +164,10 @@ def cleanup(update, context):
 
 @send_typing_action
 def cancel(update, context):
+    """
+        PURPOSE: Tap /cancel to stop any conversation if something goes wrong.
+    """
+
     user = update.message.from_user
     update.message.reply_text('Bye! I hope we can talk again some day.',
                               reply_markup=ReplyKeyboardRemove())
@@ -149,6 +188,10 @@ def error(update, context):
 
 @send_typing_action
 def help(update, context):
+    """
+        PURPOSE: Display help message
+    """
+
     log.info("User need some help !!!")
     update.message.reply_text("How this bot works ?\n\
 - Send all your photos to him.\n   - Send one by one avoid group sending.\n\n\
@@ -157,7 +200,7 @@ def help(update, context):
 
 def main():
     global updater
-    updater = Updater("ENTER YOUR TOKEN HERE", use_context=True)
+    updater = Updater("ENTER YOUR TOKEN", use_context=True)
 
     # Get the dispatcher to register handlers
     dp = updater.dispatcher
@@ -179,6 +222,7 @@ def main():
 
     dp.add_handler(conv_handler,1)
     dp.add_handler(MessageHandler(Filters.photo, photo))
+    dp.add_handler(MessageHandler(Filters.document, getMediaByFile))
     dp.add_handler(CommandHandler('convert', convert))
     dp.add_handler(CommandHandler('cleanup', cleanup))
     dp.add_handler(CommandHandler('start', help))
